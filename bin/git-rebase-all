@@ -1,0 +1,42 @@
+#!/bin/sh
+# Preparation
+set -e
+SHELL="${SHELL:-/bin/sh}"
+
+# Stash whatever is needed
+# Record if we stashed or not
+before=$(git stash list | wc -l)
+git stash --all --quiet
+after=$(git stash list | wc -l)
+unstash=$((after-before))
+
+# Rebase the current branch first
+current_branch="$(git symbolic-ref --short HEAD)"
+if git rev-parse '@{u}' >/dev/null 2>&1 ; then
+	git rebase "$@" '@{u}' ||
+	"$SHELL" -i < /dev/tty ||
+	true
+	[ ! -d .git/rebase-apply/ ] ||
+	git rebase --abort
+fi
+
+# Rebase the other branches
+git branch | grep -v github | tr -d '* ' | while read -r b ; do
+	if [ "x$b" != "x$current_branch" ] ; then
+		if git rev-parse "$b@{u}" >/dev/null 2>&1 ; then
+			git checkout "$b"
+			git rebase "$@" '@{u}' ||
+			"$SHELL" -i < /dev/tty ||
+			true
+			[ ! -d .git/rebase-apply/ ] ||
+			git rebase --abort
+		fi
+	fi
+done
+
+# Back to the original branch
+git checkout "$current_branch"
+
+# Restore the working dir if needed
+test $unstash -le 0 ||
+git stash pop --quiet
