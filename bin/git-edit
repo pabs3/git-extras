@@ -1,0 +1,4 @@
+#!/bin/sh
+set -e
+export GIT_EDITOR="$(git var GIT_EDITOR)"
+git grep --files-with-matches --null "$@" | xargs --null --no-run-if-empty sh -c '$GIT_EDITOR "$@" < /dev/tty' $GIT_EDITOR
