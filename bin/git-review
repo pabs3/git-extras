@@ -1,0 +1,69 @@
+#!/bin/bash
+
+git_history () {
+	if [ "$DISPLAY" ] ; then
+		gitk "$@"
+	else
+		tig "$@"
+	fi
+}
+
+git_record () {
+	if [ "$DISPLAY" ] ; then
+		git gui "$@"
+	else
+		git crecord "$@"
+	fi
+}
+
+if [ x$(git config --bool review.disable) = xtrue ] ; then
+	exit 0
+fi
+if git ls-files --others --exclude-standard --directory --no-empty-directory --error-unmatch -- ':/*' >/dev/null 2>/dev/null ; then
+	git_record
+fi
+if ! git diff --no-ext-diff --quiet --exit-code ; then
+	git_history --all ; exit
+fi
+if ! git diff-index --cached --quiet HEAD -- ; then
+	git_history --all ; exit
+fi
+if git rev-parse --verify --quiet refs/stash > /dev/null ; then
+	git_history --all ; exit
+fi
+export -f git_history
+for branch in $(git branch | tr -d '*') ; do
+	case "$branch" in
+		github)
+			continue
+		;;
+		githubgithub)
+			continue
+		;;
+		rejected/*)
+			continue
+		;;
+	esac
+	review="$(git config --bool branch.$branch.review)"
+	if [ $? -eq 0 -a x$review = xfalse ] ; then
+		continue
+	fi
+	remote="$(git config branch.$branch.remote)"
+	if [ $? -eq 0 ] ; then
+		if [ "$remote" != . ] ; then
+			remote="$remote/"
+		else
+			remote=""
+		fi
+		remote_branch=$(git config branch.$branch.merge | sed s_^refs/heads/__)
+		if [ $? -eq 0 ] ; then
+			count="$(git rev-list --count --left-right "$branch@{upstream}"..."$branch")"
+			if [ "$count" != "0	0" ] ; then
+				echo "$branch...$branch@{upstream}"
+			fi
+		fi
+	elif git config --get-regex remote\. > /dev/null ; then
+		echo "$branch"
+	fi
+done |
+xargs -r -d'\n' bash -c 'git_history "$@"' git_history
