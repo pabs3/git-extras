@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -e
+set -o pipefail
+tree=HEAD
+{
+	# Get all filenames out of git
+	git ls-tree --name-only -r -z "$tree" |
+	# Make the filenames safe to pass to find
+	sed --null-data 's=^=./='
+	# Append the git-find options if there are any
+	test $# -le 0 ||
+	printf '%s\0' "$@"
+} |
+# Pass the filenames and options to find
+xargs --null find
